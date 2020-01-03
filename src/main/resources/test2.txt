@@ -1,0 +1,29 @@
+{
+    "root1": {
+        "@attr1": "val1",
+        "@attr2": "val2",
+        "#root1": {
+            "elem1": {
+                "@attr3": "val3",
+                "@attr4": "val4",
+                "#elem1": "Value1"
+            },
+            "elem2": {
+                "@attr5": "val5",
+                "@attr6": "val6",
+                "#elem2": "Value2"
+            }
+        }
+    },
+    "root2": {
+        "@attr1": null,
+        "@attr2": "",
+        "#root2": null
+    },
+    "root3": {
+        "@attr1": "val2",
+        "@attr2": "val1",
+        "#root3": ""
+    },
+    "root4": "Value4"
+}

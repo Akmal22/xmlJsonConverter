@@ -3,125 +3,186 @@ package com.mycompany;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Main {
-    private static final String TEST_FILE_PATH = "/home/akmal/IdeaProjects/exploring/src/main/resources/test.txt";
-    private static final String JSON_ELEMENT_REGEX = "\"(?<elementName>[#@]?\\w+)\"\\s*:\\s*(?<elementValue>(\\{)|(\"[^\"]+\")|(null))";
-    private static final String JSON_ATTRIBUTE_REGEX = "\"(?<elementName>@\\w+)\"\\s*:\\s*\"(?<elementValue>([^\"]+)|(null))\"";
-    private static final String JSON_ELEMENT_VALUE_REGEX = "\"(?<elementName>#\\w+)\"\\s*:\\s*(?<elementValue>(\"([^\"]+)\")|(null)|(\\{))";
-    private static final String JSON_INVALID_ATTRIBUTE_REGEX = "\"(?<elementName>@?\\w+)\"\\s*:\\s*(?<elementValue>\\{)";
-    private static final String JSON_INVALID_ATTRIBUTE_NAME_REGEX = "\"(?<elementName>@)\"\\s*:\\s*(?<elementValue>\\{)";
-    private static final String JSON_ORDINAL_ELEMENT_REGEX = "\"(?<elementName>\\w+)\"\\s*:\\s*(?<elementValue>(\\{)|(\"[^\"]+\")|(null))";
-    private static final String JSON_ORDINAL_ELEMENT_VALUE_REGEX = "\"(?<elementName>\\w+)\"\\s*:\\s*(?<elementValue>(\"([^\"]+)\")|(null))";
-    private static final String JSON_ENTRY_REGEX = "^\\{.*}$";
+    private static final String TEST_FILE_PATH = "/home/akmal/IdeaProjects/xmlJsonConverter/src/main/resources/test2.txt";
+    private static final String JSON_ELEMENT_REGEX = "\"(?<elementName>[^\"]*)\"\\s*:\\s*(?<elementValue>(\\{)|(\"[^\"]*\")|(null)|(\\d*\\.*\\d*))";
 
     private static final Pattern jsonElementPattern = Pattern.compile(JSON_ELEMENT_REGEX);
 
-    private static final Pattern jsonEntryPattern = Pattern.compile(JSON_ENTRY_REGEX);
-
     public static void main(String[] args) throws IOException {
         String input = new String(Files.readAllBytes(Paths.get(TEST_FILE_PATH))).replaceAll("\\n+", "");
-
-
+        printJsonHierarchy("", "", input, true);
     }
 
-    private static String getValidJsonFromInput(String input) {
-        return null;
-    }
+    public static void printJsonHierarchy(String parentPath, String parentElement, String input, boolean isValidSingleXML) {
+        boolean hasInvalidElements = false;
+        Map<String, String> attributes = new LinkedHashMap<>();
+        Map<String, String> elements = new LinkedHashMap<>();
+        String validSingleXmlElementValue = null;
+        Matcher matcher = jsonElementPattern.matcher(input);
+        for (int i = 0; i < matcher.groupCount() && matcher.find(); i++) {
+            String elementName = matcher.group("elementName");
+            String elementValue = matcher.group("elementValue");
 
+            if (!isNotBlank(elementName) || elementName.equals("#") || elementName.equals("@")) {
+                isValidSingleXML = false;
+                hasInvalidElements = true;
+                if (elementValue.equals("{")) {
+                    int start = matcher.end();
+                    int end = start + 1;
+                    Deque<Character> brackets = new ArrayDeque<>();
+                    brackets.offer('{');
 
-    private static void printJsonHierarchy(String parentElement, String input) {
-        if (input.matches(JSON_ENTRY_REGEX)) {
-            int i = 0, j = 0; //todo variables for boundary
-            boolean isValidSingleXML = true;
-            Map<String, String> attributes = new HashMap<>();
-            String validSingleXmlElementValue = "";
-            Matcher matcher = jsonElementPattern.matcher(input);
-            if (isNotBlank(parentElement)) {
-                System.out.println("Element:");
-                System.out.println("path = " + parentElement);
-            }
-            while (matcher.find()) {
-                String matchedElement = matcher.group();
-                String elementName = matcher.group("elementName");
-                String elementValue = matcher.group("elementValue");
-                if (matchedElement.matches(JSON_INVALID_ATTRIBUTE_NAME_REGEX)
-                        || matchedElement.matches(JSON_INVALID_ATTRIBUTE_REGEX)
-                        || matchedElement.matches(JSON_ORDINAL_ELEMENT_REGEX)) {
-
-                    isValidSingleXML = false;
-                    //todo define boundaries;
-                }
-
-                if (matchedElement.matches(JSON_ELEMENT_VALUE_REGEX)) {
-                    if (parentElement.equals(elementName)) {
-                        if (!elementValue.matches("\\s*\\{\\s*")) {
-                            validSingleXmlElementValue = elementValue;
-                        } else {
-                            if (attributes.size() > 0) {
-                                System.out.println("attributes:");
-                                for (Map.Entry<String, String> entry : attributes.entrySet()) {
-                                    System.out.println(String.format("%s = \"%s\"", entry.getKey(), entry.getValue()));
-                                }
-                                attributes.clear();
-                            }
-                            //todo define boundaries
+                    while (!brackets.isEmpty()) {
+                        if (input.charAt(end) == '}') {
+                            brackets.poll();
+                        } else if (input.charAt(end) == '{') {
+                            brackets.push('{');
                         }
-                    } else {
-                        isValidSingleXML = false;
-                        String path = isNotBlank(parentElement) ? parentElement + ", " + elementName : elementName;
-                        System.out.println("Element:");
-                        System.out.println("path = " + path);
+
+                        end++;
                     }
+                    if (input.length() > end) {
+                        printJsonHierarchy(parentPath, parentElement, input.substring(end), false);
+                    }
+                    return;
+                } else {
+                    continue;
+                }
+            }
+
+            if (elementValue.trim().equals("{")) {
+                if (!elementName.matches("^#\\w+")) {
+                    isValidSingleXML = false;
+                } else {
+                    elementName = elementName.substring(1);
                 }
 
-                if (matchedElement.matches(JSON_ATTRIBUTE_REGEX)) {
-                    elementName = matcher.group("elementName").substring(1);
-                    if (isValidSingleXML) {
-                        attributes.put(matcher.group("elementName"), matcher.group("elementValue"));
-                    } else {
-                        String path = isNotBlank(parentElement) ? parentElement + ", " + elementName : elementName;
-                        System.out.println("Element:");
-                        System.out.println("path = " + path);
-                        System.out.println("value = " + elementValue);
-                    }
+                if (elementName.startsWith("@")) {
+                    elementName = elementName.substring(1);
                 }
-                if (matchedElement.matches(JSON_ORDINAL_ELEMENT_VALUE_REGEX)) {
-                    isValidSingleXML = false;
-                    String path = isNotBlank(parentElement) ? parentElement + ", " + elementName : elementName;
+
+                if (!elements.isEmpty() && !isValidSingleXML) {
+                    printElements(elements, parentPath);
+                    elements.clear();
+                }
+
+                String path = elementName.equals(parentElement) && isValidSingleXML ? parentPath : isNotBlank(parentPath) ? parentPath + ", " + elementName : elementName;
+                if (!isValidSingleXML) {
+                    System.out.println();
                     System.out.println("Element:");
                     System.out.println("path = " + path);
-                    System.out.println("value = " + elementValue);
                 }
-            }
 
-            if (!isNotBlank(validSingleXmlElementValue)) {
-                isValidSingleXML = false;
-                System.out.println();
-            }
-
-            if (isValidSingleXML) {
-                if (isNotBlank(validSingleXmlElementValue)) {
-                    System.out.println(String.format("value = \"%s\"", validSingleXmlElementValue));
+                if (!attributes.isEmpty() && elementName.equals(parentElement) && isValidSingleXML) {
+                    printAttributes(attributes);
+                    attributes.clear();
                 }
-                if (attributes.size() > 0) {
-                    System.out.println("attributes:");
-                    for (Map.Entry<String, String> entry : attributes.entrySet()) {
-                        System.out.println(String.format("%s = \"%s\"", entry.getKey(), entry.getValue()));
+
+                int start = matcher.end();
+                int end = start + 1;
+                Deque<Character> brackets = new ArrayDeque<>();
+                brackets.offer('{');
+
+                while (!brackets.isEmpty()) {
+                    if (input.charAt(end) == '}') {
+                        brackets.poll();
+                    } else if (input.charAt(end) == '{') {
+                        brackets.push('{');
                     }
+
+                    end++;
                 }
+
+                if (input.substring(start, end - 1).matches("\\s*")) {
+                    System.out.println("value = \"\"");
+                }
+                printJsonHierarchy(path, elementName, input.substring(start, end - 1), true);
+                if (input.length() > end) {
+                    printJsonHierarchy(parentPath, parentElement, input.substring(end), isValidSingleXML);
+                }
+                break;
             }
+            if (elementName.matches("@[^\"]+") && isValidSingleXML) {
+                elements.putIfAbsent(elementName.substring(1), elementValue);
+                attributes.putIfAbsent(elementName.substring(1), elementValue);
+            } else if (elementName.matches("#[^\"]+")) {
+                elementName = elementName.substring(1);
+                if (elementName.equals(parentElement) && isValidSingleXML) {
+                    elements.putIfAbsent(elementName, elementValue);
+                    validSingleXmlElementValue = elementValue;
+                } else {
+                    elements.putIfAbsent(elementName, elementValue);
+                    isValidSingleXML = false;
+                }
+            } else {
+                elements.put(elementName, elementValue);
+                isValidSingleXML = false;
+            }
+        }
+
+        if (!isValidSingleXML) {
+            String path = isNotBlank(parentPath)
+                    ? parentPath
+                    : parentElement;
+            printElements(elements, path);
         } else {
-            System.out.println("Wrong data format");
+            if (isNotBlank(validSingleXmlElementValue)) {
+                System.out.println("value = " + validSingleXmlElementValue);
+                if (!attributes.isEmpty()) {
+                    printAttributes(attributes);
+                    attributes.clear();
+                }
+            } else {
+                String path = isNotBlank(parentPath)
+                        ? parentPath
+                        : parentElement;
+                printElements(attributes, path);
+                attributes.clear();
+            }
+        }
+
+        if (hasInvalidElements && attributes.isEmpty() && elements.isEmpty() && isNotBlank(input)) {
+            System.out.println("value = \"\"");
         }
     }
 
     private static boolean isNotBlank(String input) {
         return (input != null && input.length() > 0);
+    }
+
+    private static void printElements(Map<String, String> attributes, String parentPath) {
+        if (isNotBlank(parentPath)) {
+            for (Map.Entry<String, String> attribute : attributes.entrySet()) {
+                System.out.println();
+                System.out.println("Element:");
+                System.out.println("path = " + parentPath + ", " + attribute.getKey());
+                String valueToPrint = attribute.getValue().matches("\\d+\\.?\\d*") ? String.format("\"%s\"", attribute.getValue()) : attribute.getValue();
+                System.out.println(String.format("value = %s", valueToPrint));
+            }
+        } else {
+            for (Map.Entry<String, String> attribute : attributes.entrySet()) {
+                System.out.println();
+                System.out.println("Element:");
+                System.out.println("path = " + attribute.getKey());
+                String valueToPrint = attribute.getValue().matches("\\d+\\.?\\d*") ? String.format("\"%s\"", attribute.getValue()) : attribute.getValue();
+                System.out.println(String.format("value = %s", valueToPrint));
+            }
+        }
+    }
+
+    private static void printAttributes(Map<String, String> attributes) {
+        System.out.println("attributes:");
+        for (Map.Entry<String, String> entry : attributes.entrySet()) {
+            String valueToPrint = entry.getValue().equals("null")
+                    ? "\"\""
+                    : entry.getValue().matches("\\d+\\.?\\d*") ? String.format("\"%s\"", entry.getValue()) : entry.getValue();
+            System.out.println(String.format("%s = %s", entry.getKey(), valueToPrint));
+        }
     }
 }
 
