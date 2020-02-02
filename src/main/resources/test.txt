@@ -1,1 +1,4 @@
-<root><id>6753322</id><number region="Russia">8-900-000-00-00</number><nonattr1 /><nonattr2></nonattr2><nonattr3>text</nonattr3><attr1 id="1" /><attr2 id="2"></attr2><attr3 id="3">text</attr3><email><to>to_example@gmail.com</to><from>from_example@gmail.com</from><subject>Project discussion</subject><body font="Verdana">Body message</body><date day="12" month="12" year="2018"/></email></root>
+<elem1 attr1="val1" attr2="val2">
+    <elem2 attr3="val3" attr4="val4">Value1</elem2>
+    <elem3 attr5="val5" attr6="val6">Value2</elem3>
+</elem1>

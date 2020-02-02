@@ -10,7 +10,10 @@ import java.util.regex.Pattern;
 public class Converter {
     public static final String XML_ELEMENT_REGEX = "<(?<elementEntry>(?<elementName>\\w+)\\s*[^></]*\\s*)((>(?<elementValue>.*?)</(\\k<elementName>)>)|(/>))";
     public static final String XML_ATTRIBUTE_REGEX = "(?<attributeName>\\w+)\\s*=\\s*\"(?<attributeValue>[^\"]+)\"";
-    private static final String JSON_ELEMENT_REGEX = "\"(?<elementName>[^\"]*)\"\\s*:\\s*(?<elementValue>(\\{)|(\"[^\"]*\")|(null)|(\\d*\\.*\\d*))";
+    public static final String JSON_ELEMENT_REGEX = "\"(?<elementName>[^\"]*)\"\\s*:\\s*(?<elementValue>(\\{)|(\"[^\"]*\")|(null)|(\\d*\\.*\\d*))";
+
+    public static final String XML_INPUT_REGEX = "^<.*>$";
+    public static final String JSON_INPUT_REGEX = "^\\{.*\\}$";
 
     public static final Pattern jsonElementPattern = Pattern.compile(JSON_ELEMENT_REGEX);
     public static final Pattern xmlElementPattern = Pattern.compile(XML_ELEMENT_REGEX);
@@ -110,23 +113,18 @@ public class Converter {
                     elementName = elementName.substring(1);
                 }
 
+                stringBuffer.append(isNotBlank(parentElement) ? String.format("<%s", parentElement) : "");
+
                 if (!elements.isEmpty() && !isValidSingleXML) {
-                    String output = stringBuffer.toString().trim(); //todo add parentElement
-                    if (output.charAt(output.length() - 1) != '>') {
-                        stringBuffer.append(">");
-                    }
+                    stringBuffer.append(isNotBlank(parentElement) ? ">" : "");
                     printElements(elements, stringBuffer);
                     elements.clear();
-                }
-
-                if (!isValidSingleXML) {
-                    stringBuffer.append(String.format("<%s", elementName)); //todo remove
-                }
-
-                if (!attributes.isEmpty() && elementName.equals(parentElement) && isValidSingleXML) {
-                    printAttributes(attributes, stringBuffer); //todo add parentElement
+                } else if (!attributes.isEmpty() && elementName.equals(parentElement) && isValidSingleXML) {
+                    printAttributes(attributes, stringBuffer);
+                    stringBuffer.append(isNotBlank(parentElement) ? ">" : "");
                     attributes.clear();
-                    stringBuffer.append(">");
+                } else {
+                    stringBuffer.append(isNotBlank(parentElement) ? ">" : "");
                 }
 
                 int start = matcher.end();
@@ -144,11 +142,20 @@ public class Converter {
                     end++;
                 }
 
-
-                convertJsonToXML(elementName, input.substring(start, end - 1), true, stringBuffer);
-                if (input.length() > end) {
-                    convertJsonToXML(parentElement, input.substring(end), isValidSingleXML, stringBuffer);
+                if (!isNotBlank(input.substring(start, end - 1).replaceAll("\\s+", ""))) {
+                    stringBuffer.append(String.format("<%s></%s>", elementName, elementName));
+                } else {
+                    if (parentElement.equals(elementName) && isValidSingleXML) {
+                        convertJsonToXML("", input.substring(start, end - 1), true, stringBuffer);
+                    } else {
+                        convertJsonToXML(elementName, input.substring(start, end - 1), true, stringBuffer);
+                    }
                 }
+                if (input.length() > end) {
+                    convertJsonToXML("", input.substring(end), isValidSingleXML, stringBuffer);
+                }
+
+                stringBuffer.append(isNotBlank(parentElement) ? String.format("</%s>", parentElement) : "");
                 break;
             }
             if (elementName.matches("@[^\"]+") && isValidSingleXML) {
@@ -171,31 +178,66 @@ public class Converter {
 
         if (!isValidSingleXML) {
             if (!elements.isEmpty()) {
-                String output = stringBuffer.toString().trim(); //todo remove this and add parentElement
-                if (output.charAt(output.length() - 1) != '>') {
-                    stringBuffer.append(">");
-                }
+                stringBuffer.append(isNotBlank(parentElement) ? String.format("<%s>", parentElement) : "");
                 printElements(elements, stringBuffer);
                 elements.clear();
-                stringBuffer.append(String.format("</%s>", parentElement));
+                stringBuffer.append(isNotBlank(parentElement) ? String.format("</%s>", parentElement) : "");
+            } else {
+                stringBuffer.append(isNotBlank(parentElement) && !input.contains("{") ? String.format("<%s></%s>", parentElement, parentElement) : "");
             }
         } else {
-            if (isNotBlank(validSingleXmlElementValue)) { //todo add parentElement
+            if (isNotBlank(validSingleXmlElementValue)) {
+                stringBuffer.append(isNotBlank(parentElement) ? String.format("<%s", parentElement) : "");
                 if (!attributes.isEmpty()) {
                     printAttributes(attributes, stringBuffer);
                     attributes.clear();
                 }
-                stringBuffer.append(validSingleXmlElementValue.equals("null") //remove this
+                stringBuffer.append(validSingleXmlElementValue.equals("null")
                         ? "/>"
                         : String.format(">%s</%s>", validSingleXmlElementValue.replaceAll("\"", ""), parentElement));
             } else {
                 if (!attributes.isEmpty()) {
-                    stringBuffer.append(">");   //todo remove this and add parentElement
+                    stringBuffer.append(isNotBlank(parentElement) ? String.format("<%s>", parentElement) : "");
                     printElements(attributes, stringBuffer);
                     attributes.clear();
                     stringBuffer.append(String.format("</%s>", parentElement));
                 }
             }
+        }
+    }
+
+    public static boolean jsonContainsMoreThanOneParentElement(String jsonInput) {
+        Matcher matcher = jsonElementPattern.matcher(jsonInput);
+
+        if (matcher.find()) {
+            String elementValue = matcher.group("elementValue");
+
+            if (!elementValue.trim().equals("{")) {
+                return false;
+            }
+
+            int start = matcher.end();
+            int end = start + 1;
+            Deque<Character> brackets = new ArrayDeque<>();
+            brackets.offer('{');
+
+            while (!brackets.isEmpty()) {
+                if (jsonInput.charAt(end) == '}') {
+                    brackets.poll();
+                } else if (jsonInput.charAt(end) == '{') {
+                    brackets.push('{');
+                }
+
+                end++;
+            }
+
+            if (jsonInput.substring(end).contains("{")) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
         }
     }
 
@@ -216,7 +258,7 @@ public class Converter {
     private static void printAttributes(Map<String, String> attributes, StringBuffer stringBuffer) {
         stringBuffer.append(" ");
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
-            stringBuffer.append(String.format("%s=%s ", entry.getKey(), entry.getValue().equals("null") ? "\"\"" : entry.getValue()));
+            stringBuffer.append(String.format("%s=%s ", entry.getKey(), entry.getValue().equals("null") ? "\"\"" : entry.getValue().contains("\"") ? entry.getValue() : String.format("\"%s\"", entry.getValue())));
         }
     }
 }
