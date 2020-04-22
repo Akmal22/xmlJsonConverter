@@ -36,7 +36,18 @@ public class Converter {
             if (elementValue != null) {
                 Matcher xmlElementValueMatcher = xmlElementPattern.matcher(elementValue);
                 if (xmlElementValueMatcher.find()) {
-                    convertFromXMlToJson(elementValue, stringBuffer);
+                    if (xmlAttributesMatcher.find()) {
+                        stringBuffer.append("{");
+                        do {
+                            stringBuffer.append(String.format("\"@%s\":\"%s\",",
+                                    xmlAttributesMatcher.group("attributeName"), xmlAttributesMatcher.group("attributeValue")));
+                        } while (xmlAttributesMatcher.find());
+                        stringBuffer.append(String.format("\"#%s\":", elementName));
+                        convertFromXMlToJson(elementValue, stringBuffer);
+                        stringBuffer.append("}");
+                    } else {
+                        convertFromXMlToJson(elementValue, stringBuffer);
+                    }
                 } else {
                     if (xmlAttributesMatcher.find()) {
                         stringBuffer.append("{");
@@ -128,7 +139,7 @@ public class Converter {
                 }
 
                 int start = matcher.end();
-                int end = start + 1;
+                int end = start;
                 Deque<Character> brackets = new ArrayDeque<>();
                 brackets.offer('{');
 
