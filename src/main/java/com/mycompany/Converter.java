@@ -15,11 +15,11 @@ public class Converter {
     public static final String XML_INPUT_REGEX = "^<.*>$";
     public static final String JSON_INPUT_REGEX = "^\\{.*\\}$";
 
-    public static final Pattern jsonElementPattern = Pattern.compile(JSON_ELEMENT_REGEX);
     public static final Pattern xmlElementPattern = Pattern.compile(XML_ELEMENT_REGEX);
     public static final Pattern xmlAttributePattern = Pattern.compile(XML_ATTRIBUTE_REGEX);
+    public static final Pattern jsonElementPattern = Pattern.compile(JSON_ELEMENT_REGEX);
 
-    public static void convertFromXMlToJson(String input, StringBuffer stringBuffer) {
+    public static void convertFromXMLToJson(String input, StringBuffer stringBuffer) {
         Matcher xmlMatcher = xmlElementPattern.matcher(input);
         stringBuffer.append("{");
         while (xmlMatcher.find()) {
@@ -43,10 +43,10 @@ public class Converter {
                                     xmlAttributesMatcher.group("attributeName"), xmlAttributesMatcher.group("attributeValue")));
                         } while (xmlAttributesMatcher.find());
                         stringBuffer.append(String.format("\"#%s\":", elementName));
-                        convertFromXMlToJson(elementValue, stringBuffer);
+                        convertFromXMLToJson(elementValue, stringBuffer);
                         stringBuffer.append("}");
                     } else {
-                        convertFromXMlToJson(elementValue, stringBuffer);
+                        convertFromXMLToJson(elementValue, stringBuffer);
                     }
                 } else {
                     if (xmlAttributesMatcher.find()) {
@@ -78,7 +78,7 @@ public class Converter {
         stringBuffer.append("}");
     }
 
-    public static void convertJsonToXML(String parentElement, String input, boolean isValidSingleXML, StringBuffer stringBuffer) {
+    public static void convertFromJsonToXML(String parentElement, String input, boolean isValidSingleXML, StringBuffer stringBuffer) {
         Map<String, String> attributes = new LinkedHashMap<>();
         Map<String, String> elements = new LinkedHashMap<>();
         String validSingleXmlElementValue = null;
@@ -105,7 +105,7 @@ public class Converter {
                         end++;
                     }
                     if (input.length() > end) {
-                        convertJsonToXML(parentElement, input.substring(end), false, stringBuffer);
+                        convertFromJsonToXML(parentElement, input.substring(end), false, stringBuffer);
                     }
                     return;
                 } else {
@@ -157,13 +157,13 @@ public class Converter {
                     stringBuffer.append(String.format("<%s></%s>", elementName, elementName));
                 } else {
                     if (parentElement.equals(elementName) && isValidSingleXML) {
-                        convertJsonToXML("", input.substring(start, end - 1), true, stringBuffer);
+                        convertFromJsonToXML("", input.substring(start, end - 1), true, stringBuffer);
                     } else {
-                        convertJsonToXML(elementName, input.substring(start, end - 1), true, stringBuffer);
+                        convertFromJsonToXML(elementName, input.substring(start, end - 1), true, stringBuffer);
                     }
                 }
                 if (input.length() > end) {
-                    convertJsonToXML("", input.substring(end), isValidSingleXML, stringBuffer);
+                    convertFromJsonToXML("", input.substring(end), isValidSingleXML, stringBuffer);
                 }
 
                 stringBuffer.append(isNotBlank(parentElement) ? String.format("</%s>", parentElement) : "");
